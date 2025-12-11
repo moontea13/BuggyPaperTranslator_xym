@@ -2,22 +2,30 @@ import os
 import time
 import requests
 import pandas as pd
+import openai
 from openai import OpenAI
 import tqdm
+import csv
+import tenacity
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+import json
 
 # 从environment中读取HF_TOKEN
 HF_TOKEN = os.getenv("HF_TOKEN", "") 
-# api_key = os.environ.get("HF_TOKEN")
-# print(f"API Key exists: {bool(api_key)}")
-# print(f"Key length: {len(api_key) if api_key else 0}")
 
-# 选用了最新的 OpenAI 兼容接口
+# 选用了 OpenAI 兼容接口
 client = OpenAI(
     api_key=HF_TOKEN,
     base_url="https://router.huggingface.co/v1",
 )
 
-
+# 加入tenacity重试机制
+@retry(
+    stop=stop_after_attempt(5),  
+    wait=wait_exponential(multiplier=1, min=4, max=60), 
+    retry=retry_if_exception_type((openai.RateLimitError,openai.APITimeoutError,openai.APIConnectionError)),
+    reraise=True
+)
 def translate_text(text):  # 用来调用API翻译传入的文本
     # 更改了模型
     model_name = "openai/gpt-oss-120b:fastest"
@@ -38,13 +46,15 @@ def translate_text(text):  # 用来调用API翻译传入的文本
         return response.choices[0].message.content
     except Exception as e:
         print(f"Error: {e}")
-        return None
+        raise
 
 
 def main():
     # 读取数据
-    # df = pd.read_csv("papers.csv")
     df = pd.read_csv("iccv2025.csv")
+     # 检查点
+    checkpoint = 'checkpoint.json'
+    processed = json.load(open(checkpoint))['processed'] if os.path.exists(checkpoint) else []
 
     if not os.path.exists("result.csv"):
         with open("result.csv", "w", encoding="utf-8") as f:
@@ -52,21 +62,27 @@ def main():
 
     # 遍历每一行，翻译摘要
     for index, row in tqdm.tqdm(df.iterrows(), total=len(df), desc="翻译进度"):
-        abstract = row['abstract']
-        title = row['title']
-        print(f"Translating paper {row['title']}...")
+        if index in processed:
+            continue
 
         try:
+            abstract = row['abstract']
+            title = row['title']
+            print(f"Translating paper {row['title']}...")
+
             title_cn = translate_text(title)
             abstract_cn = translate_text(abstract)
+
+            with open("result.csv", "a", newline="", encoding="utf-8-sig") as f:
+                writer = csv.writer(f)
+                writer.writerow([title,row['authors'],abstract,row['date'],row['paper_url'],row['score'],title_cn,abstract_cn])
+            
+            processed.append(index)
+            json.dump({'processed': processed}, open('checkpoint.json', 'w', encoding='utf-8'))
         except Exception as e:
             print(f"翻译失败: {e}")
-            continue  # 跳过这一条，继续下一个
 
-        # 将结果写入新文件
-        with open("result.csv", "a", encoding="utf-8") as f: # 改为用a模式写入
-            f.write(f"{title},{row['authors']},{abstract},{row['date']},{row['paper_url']},{row['score']},{title_cn},{abstract_cn}\n")
-        time.sleep(2)  # 避免请求过于频繁 更改了时间长度
+        time.sleep(5)  # 更改了时间长度
 
 
 if __name__ == "__main__":
