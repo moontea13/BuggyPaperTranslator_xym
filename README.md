@@ -11,15 +11,15 @@
 3. 复制token
 
 #### 1.2 设置Token方式（任选其一）
-创建一个.env文件并在里面写入`HF_TOKEN=你的token"
+创建一个.env文件并在里面写入`HF_TOKEN=你的token`
 
 ### 2. 需要的python第三方包
 按照requirements_fix.txt下载
 
 ## 运行方式
 ### 1. 运行前
-把`df = pd.read_csv("iccv2025.csv")`双引号内部改成翻译的目标文件
-如果需要翻译一篇新的内容，需要手动删除checkpoint.json文件
+- 把`df = pd.read_csv("iccv2025.csv")`双引号内部改成翻译的目标文件
+- 如果需要翻译一篇新的内容，需要手动删除checkpoint.json文件
 ### 2. 运行
 ### 3. 运行时：
 如果翻译到一半出现:
