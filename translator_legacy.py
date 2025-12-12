@@ -2,6 +2,7 @@ import os
 import time
 import requests
 import pandas as pd
+from dotenv import load_dotenv
 import openai
 from openai import OpenAI
 import tqdm
@@ -11,6 +12,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 import json
 
 # 从environment中读取HF_TOKEN
+load_dotenv()
 HF_TOKEN = os.getenv("HF_TOKEN", "") 
 
 # 选用了 OpenAI 兼容接口
@@ -41,7 +43,7 @@ def translate_text(text):  # 用来调用API翻译传入的文本
                  "content": f"请翻译以下文本：\n{text}"}
             ],
             temperature=0.2,
-            max_tokens=len(text) * 2,
+            max_tokens=len(text) * 3,
         )
         return response.choices[0].message.content
     except Exception as e:
